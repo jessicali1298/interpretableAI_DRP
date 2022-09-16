@@ -6,7 +6,6 @@ Created on Sun Mar 13 16:51:14 2022
 """
 
 import pandas as pd
-import numpy as np
 import os, sys, argparse
 from os.path import dirname, join, abspath
 sys.path.insert(0, abspath(join(dirname(__file__), '..')))
@@ -35,9 +34,6 @@ def parse_parameters():
                         if not specified, then only the naive predictions are outputted")
     return parser.parse_args()
 
-
-
-
 #%%
 if __name__ == '__main__':
     args = parse_parameters()
@@ -49,7 +45,6 @@ if __name__ == '__main__':
     indices = pd.read_csv(input_data_path + 'cl_drug_indices.csv', header=0)
     label_matrix = pd.read_csv(input_data_path + 'ic50_matrix.csv', header=0, index_col=0)
     foldtype = args.foldtype + '_fold'
-
     
     if args.foldtype == 'pair':
         train_drug_idx, train_cl_idx, test_drug_idx, test_cl_idx, train_ic50, test_ic50 = get_train_test_ic50(foldtype, [0,1,2], [4], 
@@ -70,5 +65,3 @@ if __name__ == '__main__':
     result_path = args.outroot + args.pathway + '_' + foldtype 
     pred_df.to_csv(result_path + '_result.csv', index=False)
     metric_df.to_csv(result_path + '_avg_by_' + args.avg_by + '_metrics.csv', index=False)
-    
-

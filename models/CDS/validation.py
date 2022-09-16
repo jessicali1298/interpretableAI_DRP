@@ -11,7 +11,7 @@ from torch.utils.data import Subset
 
 import time
 import numpy as np
-from collections import deque
+
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import r2_score
 
@@ -102,98 +102,6 @@ def test(dataloader, device, model, loss_fn):
     return test_loss, pearson, spearman, r2, ys, preds
 
 
-def tune_train_val(hyp, trainset, valset, xg_mask, gp_mask,
-                   fold_type, train_fold=[0,1,2], val_fold=[3], model_type = 'ConsDeepSignaling',
-                   load_pretrain=False, model_path = None, param_save_path=None, 
-                   hyp_save_path=None, metric_save_path=None, description=None):
-    
-    start_time = time.time()
-
-    n_in = hyp['n_in']
-    n_gene = hyp['n_gene']
-    n_pathway = hyp['n_pathway']
-    n_hidden1 = hyp['n_hidden1']
-    n_hidden2 = hyp['n_hidden2']
-    n_hidden3 = hyp['n_hidden3']
-    batch = hyp['batch_size']
-    lr = hyp['lr']
-    epoch = hyp['epoch']
-
-    
-    metric_matrix = np.zeros((epoch, 5))
-    loss_deque = deque([], maxlen=5)
-
-    best_loss = np.inf
-    best_loss_avg5 = np.inf
-    best_loss_epoch = 0
-    best_avg5_loss_epoch = 0
-    
-    # make model deterministic
-    set_seed(0)
-    
-    # declare device
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    # create dataloaders
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(valset, batch_size=batch, shuffle=False)
-    
-    # declare model, optimizer and loss function
-    if model_type == 'ConsDeepSignaling':
-        model = ConsDeepSignaling(xg_mask, gp_mask, n_in, n_gene, n_pathway, n_hidden1, n_hidden2, n_hidden3).to(device)
-    elif model_type == 'ConsDeepSignaling_mlp':
-        model = ConsDeepSignalingMLP(xg_mask, n_in, n_gene, n_pathway, n_hidden1, n_hidden2, n_hidden3).to(device)
-        
-    optimizer = torch.optim.Adam(model.parameters(), lr) 
-    loss_fn = nn.MSELoss()
-    
-    # either load a pre-trained model or train using specified train_fold
-    if load_pretrain == True:
-        load_pretrained_model(model, model_path)
-        
-        # ------------------------ testing begins ---------------------------------------
-        test_loss, pearson, spearman, r2, ys, preds = test(val_loader, device, model, loss_fn)
-        elapsed_time = time.time() - start_time
-        print("Done " + fold_type + " single-fold train and validation")
-        print("val-mse:%.4f\tval-pcc:%.4f\tval-spc:%.4f\tval-r2:%.4f\t%ds"%(
-                test_loss, pearson, spearman, r2, int(elapsed_time)))
-        return ys, preds, metric_matrix
-        
-    elif load_pretrain == False:
-        # ------------------------ training begins --------------------------------------
-        for t in range(epoch):
-            train_loss = train(train_loader, device, model, loss_fn, optimizer, pathway_freeze=False)
-            test_loss, pearson, spearman, r2, ys, preds = test(val_loader, device, model, loss_fn)
-            metric_matrix[t, 0] = train_loss
-            metric_matrix[t, 1:] = [test_loss, pearson, spearman, r2]
-            print("epoch:%d\ttrain-mse:%.4f\tval-mse:%.4f\tval-pcc:%.4f\tval-spc:%.4f\tval-r2:%.4f"%(
-                    t, train_loss, test_loss, pearson, spearman, r2))
-            
-            if best_loss > test_loss:
-                best_loss = test_loss
-                best_loss_epoch = t + 1
-                
-                # --------------------- save trained model parameters ---------------------------
-                model_epoch_name = description + '_epoch' + str(t)
-                save_model(model, hyp, metric_matrix,
-                           param_save_path, hyp_save_path, metric_save_path, model_epoch_name)
-                
-            loss_deque.append(test_loss)
-            loss_avg5 = sum(loss_deque)/len(loss_deque)
-            
-            if best_loss_avg5 > loss_avg5:
-                best_loss_avg5 = loss_avg5
-                best_avg5_loss_epoch = t + 1 
-                
-        
-
-        # ------------------------ testing begins ---------------------------------------
-        test_loss, pearson, spearman, r2, ys, preds = test(val_loader, device, model, loss_fn)
-        elapsed_time = time.time() - start_time
-        print("Done " + fold_type + " single-fold train and validation")
-        print("val-mse:%.4f\tval-pcc:%.4f\tval-spc:%.4f\tval-r2:%.4f\t%ds"%(
-                test_loss, pearson, spearman, r2, int(elapsed_time)))
-        return ys, preds, metric_matrix, best_loss_epoch, best_avg5_loss_epoch
 
 def train_val(hyp, trainset, valset, xg_mask, gp_mask,
             fold_type, model_type='ConsDeepSignaling',
@@ -212,15 +120,7 @@ def train_val(hyp, trainset, valset, xg_mask, gp_mask,
     lr = hyp['lr']
     epoch = hyp['epoch']
 
-
-    
     metric_matrix = np.zeros((epoch, 5))
-    loss_deque = deque([], maxlen=5)
-
-    best_loss = np.inf
-    best_loss_avg5 = np.inf
-    best_loss_epoch = 0
-    best_avg5_loss_epoch = 0
     
     # make model deterministic
     set_seed(0)
@@ -262,22 +162,10 @@ def train_val(hyp, trainset, valset, xg_mask, gp_mask,
             metric_matrix[t, 1:] = [test_loss, pearson, spearman, r2]
             print("epoch:%d\ttrain-mse:%.4f\tval-mse:%.4f\tval-pcc:%.4f\tval-spc:%.4f\tval-r2:%.4f"%(
                     t, train_loss, test_loss, pearson, spearman, r2))
-            
-            if best_loss > test_loss:
-                best_loss = test_loss
-                best_loss_epoch = t + 1
-
-            loss_deque.append(test_loss)
-            loss_avg5 = sum(loss_deque)/len(loss_deque)
-            
-            if best_loss_avg5 > loss_avg5:
-                best_loss_avg5 = loss_avg5
-                best_avg5_loss_epoch = t + 1 
                 
         # --------------------- save trained model parameters ---------------------------
         save_model(model, hyp, metric_matrix,
                    param_save_path, hyp_save_path, metric_save_path, description)
-        
 
         # ------------------------ testing begins ---------------------------------------
         test_loss, pearson, spearman, r2, ys, preds = test(val_loader, device, model, loss_fn)

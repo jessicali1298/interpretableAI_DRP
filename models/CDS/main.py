@@ -21,7 +21,7 @@ print(os.environ["PYTHONPATH"])
 
 import pandas as pd
 import numpy as np
-from CDS.validation import prep_data, train_val, hyper_tune_main
+from CDS.validation import prep_data, train_val
 
 from utils.utils import mkdir
 from utils.eval_result import export_results

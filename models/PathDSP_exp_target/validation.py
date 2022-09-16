@@ -12,19 +12,13 @@ from torch.utils.data import Subset
 import time
 import os
 import numpy as np
-import ray
-from ray import tune
-from ray.tune import CLIReporter
-from ray.tune.schedulers import ASHAScheduler
-from collections import deque
+
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import r2_score
 
-from PathDSP_exp_fp.model import PathDSP
+from PathDSP_exp_target.model import PathDSP
 from utils.load_data import PathDSPDataset
 from utils.utils import set_seed, save_model, load_pretrained_model, mkdir, norm_cl_features, norm_drug_features
-
-os.environ["TUNE_DISABLE_AUTO_CALLBACK_LOGGERS"] = "1"
 
 class RMSELoss(torch.nn.Module):
     def __init__(self):
@@ -63,7 +57,6 @@ def train(dataloader, device, model, loss_fn, optimizer):
     num_batches = len(dataloader)
     model.train()
     train_loss = 0
-
         
     for batch, (X_cl_exp, X_cl_mut, X_cl_cnv, X_drug_fp, X_drug_target, y) in enumerate(dataloader):
         X = torch.cat([X_cl_exp, X_drug_target],-1)
@@ -101,14 +94,10 @@ def test(dataloader, device, model, loss_fn):
             X = torch.cat([X_cl_exp, X_drug_target], -1)
             X, y = X.to(device), y.to(device)
             pred = model(X)
-#             _pred = torch.squeeze(pred) # shape is (batch_size)
             preds.append(pred)
-            # preds.append(pred.squeeze().cpu().detach().numpy())
-            # ys.append(y.squeeze().cpu().detach().numpy())
 
             test_loss += loss_fn(pred, y).item()
             
-
     preds = torch.cat(preds, axis=0).cpu().detach().numpy().reshape(-1)
     ys = torch.cat(ys, axis=0).reshape(-1)
     
@@ -116,8 +105,6 @@ def test(dataloader, device, model, loss_fn):
     pearson = pearsonr(ys, preds)[0]
     spearman = spearmanr(ys, preds)[0]
     r2 = r2_score(ys, preds)
-    # ys = np.concatenate(ys)
-    # preds = np.concatenate(preds)
     print(f"Test Error: \n Avg loss: {test_loss:>8f} \n")
     return test_loss, pearson, spearman, r2, ys, preds
 
@@ -177,130 +164,3 @@ def train_val(hyp, trainset, valset, fold_type,
     print("val-rmse:%.4f\tval-pcc:%.4f\tval-spc:%.4f\tval-r2:%.4f\t%ds"%(
             test_loss, pearson, spearman, r2, int(elapsed_time)))
     return ys, preds, metric_matrix
-
-
-
-def hyper_tune_train(config, trainset, valset, 
-                     fold_type, num_epoch,
-                     save_path=None):
-
-    start_time = time.time()
-    metric_matrix = np.zeros((num_epoch, 5))
-    metric_names = ['train_RMSE', 'val_RMSE', 'val_PCC', 'val_SPC', 'val_R2']
-    loss_deque = deque([], maxlen=5)
-
-    best_loss = np.inf
-    best_loss_avg5 = np.inf
-    best_loss_epoch = 0
-    best_avg5_loss_epoch = 0
-    
-    
-    # make model deterministic
-    set_seed(0)
-    
-    # declare device
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    # create dataloaders
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=config['batch_size'], shuffle=True)
-    val_loader = torch.utils.data.DataLoader(valset, batch_size=config['batch_size'], shuffle=False)
-    
-    # ----------------- declare model, opt_fn, loss_fn ------------------------
-    model = PathDSP(config).to(device)
-    optimizer = torch.optim.Adamax(model.parameters(), lr=config['lr_adam'], 
-                                 weight_decay=config['weight_decay_adam']) 
-    loss_fn = RMSELoss()
-    
-    
-    for epoch in range(num_epoch):
-        # ------------------------ training begins ----------------------------
-        train_loss = train(train_loader, device, model, loss_fn, optimizer)
-        
-        # --------------------- validation begins -----------------------------
-        test_loss, pearson, spearman, r2, ys, preds = test(val_loader, device, model, loss_fn)
-        
-        metric_matrix[epoch, 0] = train_loss
-        metric_matrix[epoch, 1:] = [test_loss, pearson, spearman, r2]
-        
-        if best_loss > test_loss:
-            best_loss = test_loss
-            best_loss_epoch = epoch + 1
-        
-        loss_deque.append(test_loss)
-        loss_avg5 = sum(loss_deque)/len(loss_deque)
-        
-        if best_loss_avg5 > loss_avg5:
-            best_loss_avg5 = loss_avg5
-            best_avg5_loss_epoch = epoch + 1 
-        
-        # communicate with Ray Tune
-        tune.report(loss=test_loss, pcc=pearson, spc=spearman, r2=r2,
-                    best_loss_epoch=best_loss_epoch, 
-                    best_avg5_loss_epoch=best_avg5_loss_epoch)
-
-
-        elapsed_time = time.time() - start_time
-        start_time = time.time()
-        print("%d\ttrain-rmse:%.4f\tval-rmse:%.4f\tval-pcc:%.4f\tval-spc:%.4f\tval-r2:%.4f\t%ds"%(
-                epoch, train_loss, test_loss, pearson, spearman, r2, int(elapsed_time)))
-    return metric_matrix, metric_names
-
-
-
-
-
-def hyper_tune_main(trainset, valset, fold_type, grid, 
-                    num_samples, num_train_epoch, save_path=None):
-    ray.init(ignore_reinit_error=True)
-    
-    config = {
-        'n_in': grid['n_in'], # (KEGG) 332*3 + 512 + 332; (PID) 196 (Reactome) 1608
-        'n_hidden1': tune.choice(grid['n_hidden1']), 
-        'n_hidden2': tune.choice(grid['n_hidden2']), 
-        'n_hidden3': tune.choice(grid['n_hidden3']), 
-        'n_hidden4': tune.choice(grid['n_hidden4']), 
-        'batch_size': tune.choice(grid['batch_size']),
-        'lr_adam': tune.grid_search(grid['lr_adam']),
-        'weight_decay_adam': grid['weight_decay_adam'],
-        'drop_rate': tune.grid_search(grid['drop_rate'])
-        }
-    
-    scheduler = ASHAScheduler(
-        time_attr='training_iteration',
-        # metric='loss',
-        # mode='min',
-        max_t=100,
-        grace_period=10,
-        reduction_factor=3
-        )
-    
-    reporter = CLIReporter(
-        max_progress_rows=5,
-        print_intermediate_tables=False,
-        metric_columns=["loss", "pcc", "best_loss_epoch", "best_avg5_loss_epoch", "training_iteration"])
-    
-
-    result = tune.run(
-        tune.with_parameters(hyper_tune_train, trainset=trainset, valset=valset, 
-                             fold_type=fold_type, num_epoch=num_train_epoch),
-        metric='loss',
-        mode='min',
-        resources_per_trial={"cpu": 2, "gpu": 0.33},
-        config = config,
-        verbose=3,
-        num_samples=num_samples,
-        scheduler=scheduler,
-        progress_reporter=reporter,
-        reuse_actors=True
-        )
-    
-    best_trial = result.get_best_trial('loss', 'min', 'all')
-    epoch = best_trial.last_result["best_loss_epoch"]
-    epoch_avg5 = best_trial.last_result["best_avg5_loss_epoch"]
-    print("Best trial config: {}".format(best_trial.config))
-    print("Best trial final validation loss: {}".format(best_trial.last_result["loss"]))
-    print("Best trail final validation PCC: {}".format(best_trial.last_result["pcc"]))
-    print("Best trail epoch: {}".format(epoch))
-    print("Best trail avg5_epoch: {}".format(epoch_avg5))
-    ray.shutdown()
-    return epoch, epoch_avg5, best_trial.config

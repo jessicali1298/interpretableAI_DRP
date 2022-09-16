@@ -1,0 +1,1 @@
+{"n_in": 8324, "n_hidden1": [2048, 1024], "n_hidden2": [1024, 512], "n_hidden3": [512, 256], "n_hidden4": [256, 128, 64], "batch_size": [256, 128], "lr_adam": [1e-5, 1e-4, 1e-3], "weight_decay_adam": [1e-5, 0]}

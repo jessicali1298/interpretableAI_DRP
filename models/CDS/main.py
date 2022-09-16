@@ -55,8 +55,6 @@ def parse_parameters():
                         required=False,
                         help = "path for pretrained model to be run, required if run_pretrained is True")
     return parser.parse_args()
-
-
 #%% main
 if __name__ == '__main__':
     args = parse_parameters()
@@ -83,8 +81,7 @@ if __name__ == '__main__':
     cl_exp = pd.read_csv(common_data_path + 'rnaseq_fpkm.csv', header=0, index_col=0).to_numpy()
     label_matrix = pd.read_csv(common_data_path + 'ic50_matrix.csv', header=0, index_col=0).to_numpy()
     
-    foldtype = args.foldtype + '_fold'
-    
+    foldtype = args.foldtype + '_fold' 
     
     # load hyperparameter dictionary
     with open(args.hyproot) as f:
@@ -98,7 +95,6 @@ if __name__ == '__main__':
     elif args.modeltype=='no_cnv':
         trainset, testset = prep_data(cl_exp, cl_cnv, drug_target, label_matrix, indices, 
                                  fold_type=foldtype, train_fold=[0,1,2], val_fold=[4], dataset_type='no_cnv')
-        
     #%% run_pretrained
     # ------------------------------------------- run pretrained model ------------------------------------
     if args.run_pretrained==True:
@@ -109,8 +105,8 @@ if __name__ == '__main__':
                                             model_type='ConsDeepSignaling',
                                             load_pretrain=True, model_path = model_path)
     
+    #%% run with specified hyp
     # ------------------------- running model from scratch (not loading pretrained) ---------------------------
-    #%% run with specified hyp 
     else:
         # run model with most optimal hyperparameters
         param_save_path = args.outroot + 'model_weights'

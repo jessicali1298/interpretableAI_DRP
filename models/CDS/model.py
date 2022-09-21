@@ -9,6 +9,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# The MaskedLinear class is adapted from PathDNN by Deng et al. https://pubs.acs.org/doi/10.1021/acs.jcim.0c00331
+# Deng, L. et al. Pathway-guided deep neural network toward interpretable and predictive modeling of drug sensitivity. 
+# J. Chem. Inf. Model. 60, 4497–4505 (2020).
 class MaskedLinear(nn.Linear):
     def __init__(self, in_features, out_features, mask, bias=True):
         super(MaskedLinear, self).__init__(in_features, out_features, bias)
@@ -39,9 +42,6 @@ class ConsDeepSignaling(nn.Module):
         x = torch.relu(self.layer1(x))
         x = torch.relu(self.layer2(x))
         x = torch.relu(self.layer3(x))
-        # x = F.leaky_relu(self.pathway(x))
-        # x = F.leaky_relu(self.layer1(x))
-        # x = F.leaky_relu(self.layer2(x))
         x = self.output(x)
         return x
     

@@ -15,8 +15,8 @@ import numpy as np
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import r2_score
 
-from MLP.model import FourLayerMLP
-from utils.load_data import FourLayerMLPDataset
+from MLP.model import FiveLayerMLP
+from utils.load_data import FiveLayerMLPDataset
 from utils.utils import set_seed, save_model, load_pretrained_model, mkdir, norm_cl_features
 
 
@@ -30,7 +30,7 @@ def prep_data(cl_features, drug_features, label_matrix, indices,
                                      fold_type, train_fold)
     
     # create input data with normalized features
-    dataset = FourLayerMLPDataset(norm_cl_exp, drug_features, indices, label_matrix)
+    dataset = FiveLayerMLPDataset(norm_cl_exp, drug_features, indices, label_matrix)
     train_idx = np.where(fold.isin(train_fold) == True)[0]
     val_idx = np.where(fold.isin(val_fold) == True)[0]
     trainset = Subset(dataset, train_idx)
@@ -91,8 +91,7 @@ def test(dataloader, device, model, loss_fn):
     pearson = pearsonr(ys, preds)[0]
     spearman = spearmanr(ys, preds)[0]
     r2 = r2_score(ys, preds)
-    # ys = np.concatenate(ys)
-    # preds = np.concatenate(preds)
+
     print(f"Test Error: \n Avg loss: {test_loss:>8f} \n")
     return test_loss, pearson, spearman, r2, ys, preds
 
@@ -126,7 +125,7 @@ def train_val(hyp, trainset, valset, fold_type,
     val_loader = torch.utils.data.DataLoader(valset, batch_size=batch, shuffle=False)
     
     # declare model, optimizer and loss function
-    model = FourLayerMLP(n_in, n_hidden1, n_hidden2, n_hidden3, n_hidden4).to(device)  
+    model = FiveLayerMLP(n_in, n_hidden1, n_hidden2, n_hidden3, n_hidden4).to(device)  
     optimizer = torch.optim.Adam(model.parameters(), lr=lr_adam, weight_decay=decay_adam) 
     loss_fn = nn.MSELoss() 
     

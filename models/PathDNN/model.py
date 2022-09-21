@@ -12,7 +12,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
+# The MaskedLinear class is adapted from PathDNN by Deng et al. https://pubs.acs.org/doi/10.1021/acs.jcim.0c00331
+# Deng, L. et al. Pathway-guided deep neural network toward interpretable and predictive modeling of drug sensitivity. 
+# J. Chem. Inf. Model. 60, 4497–4505 (2020).
 class MaskedLinear(nn.Linear):
     def __init__(self, in_features, out_features, mask, bias=True):
         super(MaskedLinear, self).__init__(in_features, out_features, bias)
@@ -26,8 +28,6 @@ class MaskedLinear(nn.Linear):
 class PathDNN(nn.Module):
     def __init__(self, pathway_mask, n_in, n_pathway, n_hidden1, n_hidden2, drop_rate):
         super(PathDNN, self).__init__()
-#         self.pathway = nn.Linear(n_in, n_pathway)
-#         self.pathway.weight = torch.nn.Parameter(pathway_mask * self.pathway.weight)
         self.pathway = MaskedLinear(n_in, n_pathway, pathway_mask)
         self.pathway.weight = torch.nn.Parameter(pathway_mask * self.pathway.weight)
         self.layer1 = nn.Linear(n_pathway, n_hidden1)

@@ -10,7 +10,6 @@ import torch.nn as nn
 from torch.utils.data import Subset
 
 import time
-import os
 import numpy as np
 
 from scipy.stats import pearsonr, spearmanr

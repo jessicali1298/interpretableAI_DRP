@@ -7,6 +7,8 @@ Created on Sat Apr 16 15:45:48 2022
 
 import torch as tch
 
+# The PathDSP calss is adapted from the work by Tang et al. https://www.nature.com/articles/s41598-021-82612-7
+# Tang, Y. C. & Gottlieb, A. Explainable drug sensitivity prediction through cancer pathway enrichment. Sci. Rep. 11, (2021).
 class PathDSP(tch.nn.Module):
     def __init__(self, hyp):
         # call constructors from superclass

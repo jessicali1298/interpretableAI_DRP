@@ -10,8 +10,8 @@ import torch
 from torch.utils.data import Dataset
 import numpy as np
     
-#%% Four_Layer_MLP
-class FourLayerMLPDataset(Dataset):
+#%% Five_Layer_MLP
+class FiveLayerMLPDataset(Dataset):
     def __init__(self, cl_features, drug_features, indices, label_matrix):
         """
         cl_features: 

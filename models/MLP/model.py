@@ -7,9 +7,9 @@ Created on Thu Apr 28 10:51:30 2022
 
 import torch.nn as nn
 
-class FourLayerMLP(nn.Module):
+class FiveLayerMLP(nn.Module):
     def __init__(self, n_in, n_hidden1, n_hidden2, n_hidden3, n_hidden4):
-        super(FourLayerMLP, self).__init__()
+        super(FiveLayerMLP, self).__init__()
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(n_in, n_hidden1),
             nn.ReLU(),
@@ -17,9 +17,9 @@ class FourLayerMLP(nn.Module):
             nn.ReLU(),
             nn.Linear(n_hidden2, n_hidden3),
             nn.ReLU(),
-            nn.Linear(n_hidden3, 1),
-            # nn.ReLU(),
-            # nn.Linear(n_hidden4, 1)
+            nn.Linear(n_hidden3, n_hidden4),
+            nn.ReLU(),
+            nn.Linear(n_hidden4, 1)
         )
     
     def forward(self, x):

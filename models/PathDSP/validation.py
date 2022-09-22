@@ -20,6 +20,8 @@ from PathDSP_exp_fp.model import PathDSP
 from utils.load_data import PathDSPDataset
 from utils.utils import set_seed, save_model, load_pretrained_model, mkdir, norm_cl_features, norm_drug_features
 
+# The RMSELoss calss is adapted from the work by Tang et al. https://www.nature.com/articles/s41598-021-82612-7
+# Tang, Y. C. & Gottlieb, A. Explainable drug sensitivity prediction through cancer pathway enrichment. Sci. Rep. 11, (2021).
 class RMSELoss(torch.nn.Module):
     def __init__(self):
         super(RMSELoss,self).__init__()
